@@ -1,0 +1,10 @@
+{
+  "T1110": "Brute Force",
+  "T1110.001": "Brute Force: Password Guessing",
+  "T1110.003": "Brute Force: Password Spraying",
+  "T1078": "Valid Accounts",
+  "T1021.004": "Remote Services: SSH",
+  "T1562": "Impair Defenses",
+  "T1071.001": "Application Layer Protocol: Web Protocols",
+  "T1003.001": "OS Credential Dumping: LSASS Memory"
+}
