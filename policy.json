@@ -1,0 +1,5 @@
+{
+  "protected_hosts": ["dc-01", "dc-02", "dns-01", "core-sw-01", "bastion-01", "vpn-gw-01"],
+  "protected_ips": ["10.0.0.1", "10.0.0.5", "10.0.5.10", "8.8.8.8", "8.8.4.4", "1.1.1.1"],
+  "max_requests_per_run": 3
+}

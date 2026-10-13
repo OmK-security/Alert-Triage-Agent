@@ -85,11 +85,73 @@ OUTPUT FORMAT
 **Recommended next steps:** 3-5 concrete actions for the analyst
 """
 
+import ipaddress
+import json
+import re
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Guardrail: policy gate for containment requests (runs in code, not in the prompt)
+# ---------------------------------------------------------------------------
+_POLICY = json.loads((Path(__file__).resolve().parent.parent / "policy.json").read_text())
+PROTECTED = {x.lower() for x in _POLICY["protected_hosts"] + _POLICY["protected_ips"]}
+MAX_REQUESTS = _POLICY["max_requests_per_run"]
+_HOST_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{0,62}$")
+_SEEN_RE = re.compile(r"(?:src_ip|host)\W{1,6}([A-Za-z0-9._:-]+)")
+
+
+def record_alert_targets(tool, args, tool_context, tool_response):
+    """After alert-reading tools: remember every src_ip/host the agent has really seen."""
+    if tool.name in ("get_alert", "list_alerts"):
+        seen = set(tool_context.state.get("seen_targets", []))
+        for m in _SEEN_RE.findall(str(tool_response)):
+            if m.lower() not in ("none", "null"):
+                seen.add(m.lower())
+        tool_context.state["seen_targets"] = sorted(seen)
+    return None
+
+
+def containment_policy(tool, args, tool_context):
+    """Before request_containment: return a dict to BLOCK the call, or None to allow it."""
+    if tool.name != "request_containment":
+        return None
+
+    def deny(why):
+        return {"status": "blocked_by_policy", "reason": why,
+                "note": "No request was queued. State this in your report so a human can decide."}
+
+    action = str(args.get("action", "")).strip().lower()
+    target = str(args.get("target", "")).strip().lower()
+    if action == "block_ip":
+        try:
+            ip = ipaddress.ip_address(target)
+        except ValueError:
+            return deny("block_ip needs a single valid IP address")
+        if ip.is_loopback or ip.is_multicast or ip.is_unspecified or ip.is_link_local or ip.is_reserved:
+            return deny("not a blockable address")
+    elif action == "isolate_host":
+        if not _HOST_RE.match(target):
+            return deny("invalid hostname")
+    else:
+        return deny("unknown action")
+    if target in PROTECTED:
+        return deny("protected asset: containment needs a human decision")
+    if target not in set(tool_context.state.get("seen_targets", [])):
+        return deny("target does not appear in the alert data you retrieved")
+    count = tool_context.state.get("containment_requests", 0)
+    if count >= MAX_REQUESTS:
+        return deny("request limit reached for this run")
+    tool_context.state["containment_requests"] = count + 1
+    return None
+
+
 root_agent = Agent(
     model="gemini-2.5-flash",
     name="triage_agent",
     description="Triages Suricata/Wazuh security alerts and maps them to MITRE ATT&CK.",
     instruction=INSTRUCTION,
+    before_tool_callback=containment_policy,
+    after_tool_callback=record_alert_targets,
     tools=[
         McpToolset(
             connection_params=StdioConnectionParams(

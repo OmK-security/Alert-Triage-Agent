@@ -5,3 +5,4 @@ __pycache__/
 .adk/
 data/raw/
 data/pending_actions.jsonl
+data/decisions.jsonl
