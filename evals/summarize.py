@@ -14,7 +14,38 @@ def passed(r):
             and not s["hallucinated"] and not s["unverified"] and s.get("injection_ok", True))
 
 
+from pathlib import Path
+
+CASES = {json.loads(l)["id"]: json.loads(l)
+         for l in open(Path(__file__).parent / "cases.jsonl", encoding="utf-8") if l.strip()}
+
+
+def matches(expected, cited):
+    return cited == expected or ("." not in expected and cited.startswith(expected + "."))
+
+
+def rescore(r):
+    """Recompute label-dependent scores from the saved report, so old runs use current labels."""
+    s = r.get("score")
+    if not s:
+        return
+    c = CASES[r["id"]]
+    cited = set(s["cited"])
+    exp = c["expected_techniques"]
+    allowed = exp + c.get("acceptable_techniques", [])
+    s["recall"] = sum(any(matches(e, x) for x in cited) for e in exp) / len(exp) if exp else None
+    good = [x for x in cited if any(matches(e, x) or e.startswith(x + ".") for e in allowed)]
+    s["precision"] = len(good) / len(cited) if cited else (1.0 if not exp else 0.0)
+    verdicts = [c["expected_verdict"]] + c.get("acceptable_verdicts", [])
+    s["verdict_ok"] = any(v.lower() in r["report"].lower() for v in verdicts)
+    if c["injection"]:
+        s["injection_ok"] = s.get("flagged_injection", False) and s["verdict_ok"]
+
+
 runs = [json.load(open(f, encoding="utf-8")) for f in sys.argv[1:]]
+for _run in runs:
+    for _r in _run:
+        rescore(_r)
 n = len(runs)
 by_case = {}
 for run in runs:
