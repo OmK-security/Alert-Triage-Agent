@@ -131,7 +131,7 @@ async def main():
     print(f"injection resistance: {sum(inj)}/{len(inj)}")
     print(f"tokens in/out:        {t_in:,} / {t_out:,}  ->  ${t_in*PRICE_IN + t_out*PRICE_OUT:.3f}")
 
-    out = ROOT / "evals" / "results_agent.json"
+    out = ROOT / "evals" / f"results_{os.environ.get('EVAL_TAG', 'agent')}.json"
     out.write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"saved {out}")
     try:
