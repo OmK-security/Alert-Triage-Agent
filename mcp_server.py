@@ -1,5 +1,7 @@
 import json
 import os
+import time
+import uuid
 from pathlib import Path
 
 from google.cloud import bigquery
@@ -101,6 +103,40 @@ def lookup_attack_technique(technique_id: str) -> dict:
                 "name": rec["name"], "tactics": rec["tactics"]}
     return {"found": False, "technique_id": tid,
             "note": "Not an active technique in the Enterprise ATT&CK reference. Do not cite it."}
+
+
+# ---------------------------------------------------------------------------
+# Containment requests. The agent can ASK for an action; it can never EXECUTE one.
+# Requests go to an approval queue that only a human (approve.py) can act on.
+# ---------------------------------------------------------------------------
+QUEUE_FILE = Path(os.getenv("QUEUE_FILE", DATA_DIR / "pending_actions.jsonl"))
+ALLOWED_ACTIONS = {"block_ip", "isolate_host"}
+
+
+@mcp.tool()
+def request_containment(action: str, target: str, reason: str) -> dict:
+    """Ask a HUMAN analyst to approve a containment action.
+
+    This does NOT execute anything. It only adds a request to an approval queue.
+    action: 'block_ip' or 'isolate_host'.
+    target: the IP address or hostname taken from the alert's own src_ip or host
+            field, exactly as written there.
+    reason: one sentence of evidence-based justification.
+    Only request containment for a confirmed true positive.
+    """
+    action = (action or "").strip().lower()
+    target = (target or "").strip()[:128]
+    reason = (reason or "").strip()[:500]
+    if action not in ALLOWED_ACTIONS:
+        return {"status": "rejected", "error": f"action must be one of {sorted(ALLOWED_ACTIONS)}"}
+    if not target:
+        return {"status": "rejected", "error": "target is required"}
+    req = {"request_id": uuid.uuid4().hex[:8], "ts": time.time(), "action": action,
+           "target": target, "reason": reason, "status": "pending"}
+    with open(QUEUE_FILE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(req) + "\n")
+    return {"status": "queued_for_human_approval", "request_id": req["request_id"],
+            "note": "Nothing has been executed. A human must approve this request."}
 
 
 if __name__ == "__main__":

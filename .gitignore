@@ -4,3 +4,4 @@ __pycache__/
 .env
 .adk/
 data/raw/
+data/pending_actions.jsonl
