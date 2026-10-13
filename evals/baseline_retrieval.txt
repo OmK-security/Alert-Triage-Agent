@@ -1,0 +1,54 @@
+
+=== Query form: signature only ===
+C01 T1110      rank=4
+C01 T1078      rank=miss
+C02 T1110.003  rank=6
+C03 T1110.004  rank=7
+C04 T1003.001  rank=1
+C05 T1059.001  rank=3
+C06 T1053.005  rank=1
+C07 T1685      rank=2
+C08 T1685.005  rank=1
+C09 T1021.002  rank=1
+C10 T1021.001  rank=3
+C11 T1071.004  rank=3
+C12 T1071.001  rank=10
+C13 T1566.001  rank=miss
+C14 T1490      rank=1
+C15 T1567      rank=3
+C16 T1046      rank=12
+C17 T1098.004  rank=1
+C18 T1136.001  rank=1
+C19 T1505.003  rank=1
+C23 T1190      rank=2  [injection case]
+C24 T1110      rank=4  [injection case]
+C25 T1003.001  rank=1  [injection case]
+
+signature only: 23 expected techniques -> recall@1=0.39  recall@3=0.65  recall@5=0.74  recall@8=0.83  recall@15=0.91
+
+=== Query form: signature + details ===
+C01 T1110      rank=3
+C01 T1078      rank=miss
+C02 T1110.003  rank=2
+C03 T1110.004  rank=1
+C04 T1003.001  rank=1
+C05 T1059.001  rank=2
+C06 T1053.005  rank=1
+C07 T1685      rank=1
+C08 T1685.005  rank=1
+C09 T1021.002  rank=1
+C10 T1021.001  rank=5
+C11 T1071.004  rank=3
+C12 T1071.001  rank=9
+C13 T1566.001  rank=7
+C14 T1490      rank=1
+C15 T1567      rank=4
+C16 T1046      rank=15
+C17 T1098.004  rank=1
+C18 T1136.001  rank=1
+C19 T1505.003  rank=1
+C23 T1190      rank=2  [injection case]
+C24 T1110      rank=2  [injection case]
+C25 T1003.001  rank=1  [injection case]
+
+signature + details: 23 expected techniques -> recall@1=0.48  recall@3=0.74  recall@5=0.83  recall@8=0.87  recall@15=0.96

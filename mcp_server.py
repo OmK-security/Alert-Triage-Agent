@@ -7,6 +7,7 @@ from mcp.server.fastmcp import FastMCP
 
 DATA_DIR = Path(__file__).parent / "data"
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "smooth-epsilon-rxjsq")
+ALERTS_FILE = Path(os.getenv("ALERTS_FILE", DATA_DIR / "alerts.json"))
 mcp = FastMCP("alert-triage")
 
 # Full ATT&CK reference (697 active techniques), loaded once at startup.
@@ -43,14 +44,14 @@ def _bq():
 @mcp.tool()
 def list_alerts() -> list[dict]:
     """Return all current security alerts."""
-    with open(DATA_DIR / "alerts.json") as f:
+    with open(ALERTS_FILE, encoding="utf-8") as f:
         return json.load(f)
 
 
 @mcp.tool()
 def get_alert(alert_id: str) -> dict:
     """Return one alert by its ID, e.g. 'ALR-0003'."""
-    with open(DATA_DIR / "alerts.json") as f:
+    with open(ALERTS_FILE, encoding="utf-8") as f:
         alerts = json.load(f)
     for a in alerts:
         if a["alert_id"] == alert_id.strip():
