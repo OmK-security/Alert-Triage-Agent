@@ -60,7 +60,7 @@ def get_alert(alert_id: str) -> dict:
 
 
 @mcp.tool()
-def search_attack_techniques(behavior: str, top_k: int = 8) -> list[dict]:
+def search_attack_techniques(behavior: str, top_k: int = 15) -> list[dict]:
     """Semantic search over MITRE ATT&CK. Describe the observed BEHAVIOR in plain
     English (e.g. 'repeated failed logins followed by a successful login'), not
     just a protocol or tool name. Returns CANDIDATE techniques ranked by
