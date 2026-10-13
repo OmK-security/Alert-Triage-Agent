@@ -19,7 +19,7 @@ load_dotenv(ROOT / "triage_agent" / ".env")
 
 # 1. Build a temp alerts file from the cases BEFORE importing the agent,
 #    because the agent snapshots os.environ when the MCP toolset is created.
-cases = [json.loads(l) for l in open(ROOT / "evals" / "cases.jsonl", encoding="utf-8") if l.strip()]
+cases = [json.loads(l) for l in open(ROOT / "evals" / os.environ.get("CASES_FILE", "cases.jsonl"), encoding="utf-8") if l.strip()]
 wanted = set(sys.argv[1:])
 if wanted:
     cases = [c for c in cases if c["id"] in wanted]

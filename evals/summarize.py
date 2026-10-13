@@ -16,8 +16,13 @@ def passed(r):
 
 from pathlib import Path
 
-CASES = {json.loads(l)["id"]: json.loads(l)
-         for l in open(Path(__file__).parent / "cases.jsonl", encoding="utf-8") if l.strip()}
+CASES = {}
+for _f in ("cases.jsonl", "holdout.jsonl"):
+    _p = Path(__file__).parent / _f
+    if _p.exists():
+        for _l in open(_p, encoding="utf-8"):
+            if _l.strip():
+                CASES[json.loads(_l)["id"]] = json.loads(_l)
 
 
 def matches(expected, cited):
