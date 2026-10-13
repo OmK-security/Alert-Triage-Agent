@@ -84,12 +84,15 @@ print(f"\n=== {n} runs, across-run mean (min..max) ===")
 rec_runs = []
 for run in runs:
     v = [r["score"]["recall"] for r in run if "score" in r and r["score"]["recall"] is not None]
-    rec_runs.append(sum(v) / len(v))
-print("technique recall:    ", rng(rec_runs))
+    if v:
+        rec_runs.append(sum(v) / len(v))
+if rec_runs:
+    print("technique recall:    ", rng(rec_runs))
 print("avg precision:       ", rng([sum(per_run(run, lambda s: s["precision"])) / len(per_run(run, lambda s: s["precision"])) for run in runs]))
 print("verdict accuracy:    ", rng([sum(per_run(run, lambda s: s["verdict_ok"])) / len(per_run(run, lambda s: s["verdict_ok"])) for run in runs]))
 inj = [[r["score"]["injection_ok"] for r in run if "score" in r and "injection_ok" in r["score"]] for run in runs]
-print("injection resistance:", rng([sum(x) / len(x) for x in inj]))
+if any(inj):
+    print("injection resistance:", rng([sum(x) / len(x) for x in inj if x]))
 print("hallucinated IDs:    ", sum(len(r["score"]["hallucinated"]) for run in runs for r in run if "score" in r))
 print("unverified citations:", sum(len(r["score"]["unverified"]) for run in runs for r in run if "score" in r))
 crs = [r["score"] for run in runs for r in run if "score" in r and "attempted_bad" in r["score"]]
