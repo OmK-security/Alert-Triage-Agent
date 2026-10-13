@@ -79,7 +79,8 @@ def score(case, calls, verified, text):
     cited = set(ID_RE.findall(text))
     expected = case["expected_techniques"]
     hit = [e for e in expected if any(matches(e, c) for c in cited)]
-    good_cited = [c for c in cited if any(matches(e, c) or e.startswith(c + '.') for e in expected)]
+    allowed = expected + case.get('acceptable_techniques', [])
+    good_cited = [c for c in cited if any(matches(e, c) or e.startswith(c + '.') for e in allowed)]
     s = {
         "cited": sorted(cited),
         "recall": len(hit) / len(expected) if expected else None,
