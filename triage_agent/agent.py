@@ -145,13 +145,53 @@ def containment_policy(tool, args, tool_context):
     return None
 
 
+# ---------------------------------------------------------------------------
+# Guardrail: citation gate. Enforces "verify before cite" in code, not in the prompt.
+# ---------------------------------------------------------------------------
+_TID_RE = re.compile(r"\bT\d{4}(?:\.\d{3})?\b")
+
+
+def record_verified_ids(tool, args, tool_context, tool_response):
+    """After lookup_attack_technique: remember the IDs the reference confirmed as real."""
+    if tool.name == "lookup_attack_technique" and re.search(r"found\W+true", str(tool_response), re.I):
+        tid = str(args.get("technique_id", "")).strip().upper()
+        if tid:
+            verified = set(tool_context.state.get("verified_ids", []))
+            verified.add(tid)
+            tool_context.state["verified_ids"] = sorted(verified)
+    return None
+
+
+def citation_gate(callback_context, llm_response):
+    """After each model response: tag any ATT&CK ID in the final report that was never verified."""
+    content = llm_response.content
+    if getattr(llm_response, "partial", False) or not content or not content.parts:
+        return None
+    if any(p.function_call for p in content.parts):
+        return None  # still working; only the final report is checked
+    verified = set(callback_context.state.get("verified_ids", []))
+
+    def flag(m):
+        return m.group(0) if m.group(0) in verified else m.group(0) + " [UNVERIFIED]"
+
+    fixed = llm_response.model_copy(deep=True)
+    changed = False
+    for part in fixed.content.parts:
+        if part.text and not part.thought:
+            new = _TID_RE.sub(flag, part.text)
+            if new != part.text:
+                part.text, changed = new, True
+    return fixed if changed else None
+
+
 root_agent = Agent(
     model="gemini-2.5-flash",
     name="triage_agent",
     description="Triages Suricata/Wazuh security alerts and maps them to MITRE ATT&CK.",
     instruction=INSTRUCTION,
     before_tool_callback=containment_policy,
-    after_tool_callback=record_alert_targets,
+    after_tool_callback=[record_alert_targets, record_verified_ids],
+    after_model_callback=citation_gate,
     tools=[
         McpToolset(
             connection_params=StdioConnectionParams(

@@ -116,5 +116,7 @@ if crs:
     ut = [c["requested_expected"] for c in crs if c["requested_expected"] is not None]
     if ut:
         print(f"legit containment requested: {sum(ut)}/{len(ut)}")
+flagged = sum(r.get('report', '').count('[UNVERIFIED]') for run in runs for r in run)
+print(f'citations tagged [UNVERIFIED] by the citation gate: {flagged}')
 allp = [passed(r) for run in runs for r in run]
 print(f"cases fully passing: {sum(allp)}/{len(allp)} case-runs")
