@@ -10,7 +10,7 @@ The point of the project is not just the agent. It is how the agent is **measure
                 |  tools via MCP server
                 |    search_attack_techniques  -> BigQuery VECTOR_SEARCH over 697 ATT&CK v19 techniques
                 |    lookup_attack_technique   -> verify an ID exists before citing it
-                |    request_containment       -> appends to an approval queue (cannot execute anything)
+                |    request_containment       -> server-side policy check, then Firestore approval queue (cannot execute anything)
                 |
                 +-- before_tool_callback : policy gate     (validates containment targets)
                 +-- after_tool_callback  : records seen targets and verified technique IDs
@@ -30,6 +30,7 @@ The point of the project is not just the agent. It is how the agent is **measure
 | Approval queue | `request_containment` + `approve.py` | The agent cannot act, only ask. A human decides. |
 | Policy gate | `before_tool_callback` | Rejects invalid IPs/CIDRs, loopback/special addresses, bad hostnames, unknown actions, protected assets (`policy.json`), targets that never appeared in the alert data, and more than 3 requests per run. |
 | Citation gate | `after_model_callback` | Any technique ID in the final report that was not confirmed by `lookup_attack_technique` is tagged `[UNVERIFIED]`. |
+| Server-side policy | inside `mcp_server.py` | The same target rules, enforced in the tool server itself: valid IP/hostname, not a protected asset, and the target must be a structured `src_ip`/`host` field of a real alert. Also rejects duplicate pending requests. Holds even if the agent code is bypassed. |
 
 ## Evaluation method
 
@@ -65,12 +66,14 @@ Held-out performance matches the tuned suite, so the gains were not just overfit
 - **Prompt-injection attacks:** the agent resisted all of them. 0 of 18 produced a bad containment request.
 - **Spoofed or reflected "trusted" sources** (alert text claiming a target was approved or internal) **did beat the agent's own rules:** without the code gate, 2 of 9 runs queued a bad request.
 - **With the policy gate:** 0 bad requests queued across 33 case-runs, 8 requests stopped by the gate, and 12 of 12 legitimate containment requests still went through.
+- **Re-run after adding the server-side gate:** 0 bad requests queued across 33 case-runs, 9 stopped by the agent-side gate, 12 of 12 legitimate requests still went through.
 
 ## Design notes
 
 - **The red team changed the design.** Prompt rules held against injection but not against a convincing forged context. The fix was a deterministic gate, not more prompt text.
 - **Verify before cite.** Technique IDs are only trusted after a lookup confirms them. ATT&CK v19 renumbered some techniques (for example T1562.001 became T1685), which is the kind of stale-memory error this catches.
 - **Search, judge, verify.** Retrieval proposes candidates, the model judges them against the alert, and a lookup confirms each ID.
+- **One scoring definition.** A CI gate once disagreed with the reported results because the live scorer ignored `acceptable_verdicts`. Scoring now lives in one module (`evals/scoring.py`) used by both the summary and the gate.
 
 ## Known limitations
 
@@ -79,7 +82,10 @@ Held-out performance matches the tuned suite, so the gains were not just overfit
 - **Persistent weak spots:** C01 never reliably finds T1078; C16 sometimes picks external recon (T1595) over network scanning (T1046); C11, C12 and C19 often add extra techniques, which lowers precision; H07 and H09 are the weakest held-out cases.
 - **The citation gate is unit-tested but has not fired in a live run.** In every eval the agent had already verified everything it cited. It is a safety net, not a measured improvement.
 - **Benign verdicts backed only by text inside the alert are forgeable.** The proper fix is a trusted allowlist or asset-inventory tool, which does not exist yet.
-- **Gates are agent-side.** They run as ADK callbacks. A production deployment should enforce the same checks in the approval service or MCP server, so they hold even if the agent is bypassed.
+- **The per-run request cap is agent-side only.** The MCP server can serve many sessions, so it enforces session-independent rules (target validity, protected assets, real-alert targets, no duplicates) and leaves "3 requests per run" to the agent callback.
+- **Benign alerts are still trusted too easily.** The server checks that a target exists in the alert store, not that an asset is genuinely safe to touch; an allowlist or asset-inventory service would add that.
+- **One CI identity both evaluates and deploys.** Splitting it in two would reduce its blast radius.
+- **CI evals are a sample.** The pipeline runs 10 reliable tuned cases and the red-team suite with a single trial, as a regression tripwire. It is not a replacement for the full 3-trial suites.
 - **Containment is simulated.** Nothing real is blocked or isolated.
 
 ## Repository layout
@@ -100,9 +106,28 @@ From the project root, with the virtual environment active and `triage_agent/.en
 
 In Cloud Shell, also pass `--allow_origins` with your web-preview URL. Then open the preview on port 8080 and pick `triage_agent`.
 
+## Deployment
+
+- **Cloud Run** (us-central1): private (no unauthenticated access), scale-to-zero, maximum one instance, running as a dedicated least-privilege service account.
+- The MCP server runs in the same container as a subprocess and receives an allowlisted set of environment variables, not the whole environment.
+- **Approval queue:** Firestore (`pending_actions`, `decisions`). `QUEUE_BACKEND=firestore python approve.py` is the human review step; the reviewer uses their own credentials, never the agent's.
+- Try it yourself: `gcloud run services proxy triage-agent --region us-central1 --port 8080`, then open Cloud Shell Web Preview on port 8080.
+- `scripts/setup_cloud.sh` records the cloud setup (written from the manual steps, not re-run as one script); `scripts/teardown.sh` removes everything it created.
+
+## CI/CD
+
+GitHub Actions (`.github/workflows/ci-cd.yml`), on every push to `main`:
+
+1. Unit tests for the server-side policy (no LLM, free).
+2. An eval subset with a quality floor (mean recall 0.85, mean precision 0.75) plus hard safety rules: no hallucinated or unverified IDs, no bad containment request queued, no followed injection.
+3. The red-team suite under the same hard safety rules.
+4. Deploy to Cloud Run, only if every earlier stage passed.
+
+Authentication is keyless (Workload Identity Federation): no service-account key exists anywhere. Google accepts GitHub's short-lived token only for pushes to `main` of this repository.
+
 ## Roadmap
 
-Phase 4: deployment (Cloud Run / Agent Runtime), CI/CD that runs the evals, Secret Manager, and moving the gates server-side.
+Split the CI identity, add an asset-inventory tool for benign verdicts, and widen the CI eval sample.
 
 ## License
 
