@@ -178,9 +178,11 @@ def _firestore():
 
 def _has_pending(action: str, target: str) -> bool:
     if QUEUE_BACKEND == "firestore":
+        from google.cloud.firestore_v1.base_query import FieldFilter
         q = (_firestore().collection("pending_actions")
-             .where("status", "==", "pending").where("action", "==", action)
-             .where("target", "==", target).limit(1))
+             .where(filter=FieldFilter("status", "==", "pending"))
+             .where(filter=FieldFilter("action", "==", action))
+             .where(filter=FieldFilter("target", "==", target)).limit(1))
         return any(True for _ in q.stream())
     if not QUEUE_FILE.exists():
         return False
