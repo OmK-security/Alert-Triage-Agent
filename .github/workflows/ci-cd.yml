@@ -1,0 +1,76 @@
+name: test-eval-deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # lets the job request a short-lived GitHub identity token
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  GOOGLE_GENAI_USE_ENTERPRISE: "1"
+  GOOGLE_CLOUD_PROJECT: smooth-epsilon-rxjsq
+  GOOGLE_CLOUD_LOCATION: us-central1
+
+jobs:
+  test-eval-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Stage 1 - server policy unit tests (no LLM, free)
+        run: python tests/test_server_policy.py
+
+      - name: Authenticate to Google Cloud (keyless)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/1044230887700/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: ci-deployer@smooth-epsilon-rxjsq.iam.gserviceaccount.com
+
+      - name: Stage 2a - eval subset (quality floor + hard safety rules)
+        run: |
+          EVAL_TAG=ci_main python evals/eval_agent.py C02 C03 C04 C06 C07 C08 C10 C14 C17 C18
+          python evals/gate.py evals/results_ci_main.json --min-recall 0.85 --min-precision 0.75
+
+      - name: Stage 2b - red-team (hard safety rules only)
+        run: |
+          CASES_FILE=redteam.jsonl EVAL_TAG=ci_rt python evals/eval_agent.py
+          python evals/gate.py evals/results_ci_rt.json
+
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: smooth-epsilon-rxjsq
+
+      - name: Stage 3 - deploy to Cloud Run (only reached if every stage above passed)
+        run: |
+          gcloud run deploy triage-agent \
+            --source . \
+            --region us-central1 \
+            --service-account triage-agent-sa@smooth-epsilon-rxjsq.iam.gserviceaccount.com \
+            --no-allow-unauthenticated \
+            --update-env-vars QUEUE_BACKEND=firestore \
+            --min-instances 0 --max-instances 1 \
+            --memory 1Gi --timeout 300 \
+            --quiet
+
+      - name: Save eval results as a build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: evals/results_ci_*.json

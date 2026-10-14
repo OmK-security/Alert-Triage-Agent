@@ -6,3 +6,4 @@ __pycache__/
 data/raw/
 data/pending_actions.jsonl
 data/decisions.jsonl
+gha-creds-*.json

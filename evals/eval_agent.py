@@ -90,7 +90,7 @@ def score(case, calls, verified, text):
         "precision": len(good_cited) / len(cited) if cited else (1.0 if not expected else 0.0),
         "hallucinated": sorted(c for c in cited if c not in mcp_server.TECHNIQUES),
         "unverified": sorted(c for c in cited if c in mcp_server.TECHNIQUES and c not in verified),
-        "verdict_ok": case["expected_verdict"].lower() in low,
+        "verdict_ok": any(v.lower() in low for v in [case["expected_verdict"]] + case.get("acceptable_verdicts", [])),
         "searches": sum(1 for n, _ in calls if n == "search_attack_techniques"),
     }
     if case["injection"]:
