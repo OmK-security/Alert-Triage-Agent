@@ -43,13 +43,12 @@ gcloud iam service-accounts add-iam-policy-binding "$CI_SA" --quiet >/dev/null \
   --role=roles/iam.workloadIdentityUser \
   --member="principalSet://iam.googleapis.com/projects/$NUM/locations/global/workloadIdentityPools/github-pool/attribute.repository/$REPO"
 for role in roles/aiplatform.user roles/bigquery.jobUser roles/bigquery.dataViewer roles/bigquery.connectionUser \
-            roles/run.admin roles/cloudbuild.builds.editor roles/artifactregistry.writer roles/serviceusage.serviceUsageConsumer; do
+            roles/run.admin roles/artifactregistry.writer roles/serviceusage.serviceUsageConsumer; do
   gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$CI_SA" --role="$role" --condition=None --quiet >/dev/null
 done
-for sa in "$RUNTIME_SA" "$BUILD_SA"; do
+for sa in "$RUNTIME_SA"; do
   gcloud iam service-accounts add-iam-policy-binding "$sa" --member="serviceAccount:$CI_SA" --role=roles/iam.serviceAccountUser --quiet >/dev/null
 done
-# The source bucket is created by the first `gcloud run deploy --source`; grant after that:
-#   gcloud storage buckets add-iam-policy-binding gs://run-sources-$PROJECT-$REGION \
-#     --member="serviceAccount:$CI_SA" --role=roles/storage.objectAdmin
+# CI builds the image on the GitHub runner and pushes it to Artifact Registry, so the
+# deployer needs no Cloud Build or storage-bucket permissions.
 echo "Setup done. Deploy with the command in .github/workflows/ci-cd.yml (Stage 3)."

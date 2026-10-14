@@ -125,6 +125,8 @@ GitHub Actions (`.github/workflows/ci-cd.yml`), on every push to `main`:
 
 Authentication is keyless (Workload Identity Federation): no service-account key exists anywhere. Google accepts GitHub's short-lived token only for pushes to `main` of this repository.
 
+The deploy job builds the image on the runner, pushes it to Artifact Registry tagged with the commit hash, and deploys that image, so every running revision traces back to the exact commit. The deployer identity has no Cloud Build or storage-bucket permissions.
+
 ## Roadmap
 
 Split the CI identity, add an asset-inventory tool for benign verdicts, and widen the CI eval sample.
