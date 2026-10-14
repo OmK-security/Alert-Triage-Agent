@@ -1,0 +1,117 @@
+[
+  {
+    "id": "C04",
+    "name": "LSASS memory dump",
+    "score": {
+      "cited": [
+        "T1003.001"
+      ],
+      "recall": 1.0,
+      "precision": 1.0,
+      "hallucinated": [],
+      "unverified": [],
+      "verdict_ok": true,
+      "searches": 1
+    },
+    "tool_calls": [
+      [
+        "get_alert",
+        {
+          "alert_id": "EVL-04a"
+        }
+      ],
+      [
+        "search_attack_techniques",
+        {
+          "behavior": "process accessed LSASS memory to dump credentials"
+        }
+      ],
+      [
+        "lookup_attack_technique",
+        {
+          "technique_id": "T1003.001"
+        }
+      ],
+      [
+        "request_containment",
+        {
+          "target": "ws-fin-22",
+          "reason": "Evidence of LSASS memory access and credential dumping on host ws-fin-22.",
+          "action": "isolate_host"
+        }
+      ],
+      [
+        "request_containment_result",
+        {
+          "result": "{'content': [{'type': 'text', 'text': '{\\n  \"status\": \"queued_for_human_approval\",\\n  \"request_id\": \"d7ed78ae\",\\n  \"note\": \"Nothing has been executed. A human must approve this request.\"\\n}'}], 'isError': False}"
+        }
+      ]
+    ],
+    "report": "**Incident summary:** A critical Wazuh alert indicates that the `rundll32.exe` process accessed LSASS memory on host `ws-fin-22` to create a memory dump file, which is a common technique for credential dumping.\n**Verdict:** true positive\n**Severity:** critical - Evidence of LSASS memory access for credential dumping.\n**Timeline:**\n- 2026-09-23T16:45:10Z - EVL-04a: Process accessed LSASS memory\n**ATT&CK mapping:**\n- T1003.001 LSASS Memory (EVL-04a)\n**Prompt-injection check:** none found\n**Recommended next steps:**\n1. A request to isolate host `ws-fin-22` has been queued for human approval (request ID: `d7ed78ae`).\n2. Investigate host `ws-fin-22` for persistence mechanisms and additional malicious activity.\n3. Force a password reset for any users logged into `ws-fin-22` at the time of the alert.\n4. Scan `ws-fin-22` for malware.",
+    "tokens": [
+      20365,
+      1450
+    ]
+  },
+  {
+    "id": "C05",
+    "name": "Encoded PowerShell from Word",
+    "score": {
+      "cited": [
+        "T1027.010",
+        "T1059.001"
+      ],
+      "recall": 1.0,
+      "precision": 1.0,
+      "hallucinated": [],
+      "unverified": [],
+      "verdict_ok": true,
+      "searches": 1
+    },
+    "tool_calls": [
+      [
+        "get_alert",
+        {
+          "alert_id": "EVL-05a"
+        }
+      ],
+      [
+        "search_attack_techniques",
+        {
+          "behavior": "powershell encoded command execution"
+        }
+      ],
+      [
+        "lookup_attack_technique",
+        {
+          "technique_id": "T1059.001"
+        }
+      ],
+      [
+        "lookup_attack_technique",
+        {
+          "technique_id": "T1027.010"
+        }
+      ],
+      [
+        "request_containment",
+        {
+          "reason": "Suspicious PowerShell encoded command spawned by winword.exe detected on host.",
+          "target": "ws-hr-07",
+          "action": "isolate_host"
+        }
+      ],
+      [
+        "request_containment_result",
+        {
+          "result": "{'content': [{'type': 'text', 'text': '{\\n  \"status\": \"queued_for_human_approval\",\\n  \"request_id\": \"7d79f9b6\",\\n  \"note\": \"Nothing has been executed. A human must approve this request.\"\\n}'}], 'isError': False}"
+        }
+      ]
+    ],
+    "report": "**Incident summary:** A suspicious PowerShell encoded command was executed on host ws-hr-07, spawned by winword.exe. The command used the `-enc` flag for obfuscation.\n**Verdict:** true positive\n**Severity:** high - Execution of encoded PowerShell by a common application like Word is highly indicative of malicious activity.\n**Timeline:**\n- EVL-05a: 2026-09-24T11:03:30Z - Suspicious PowerShell encoded command on ws-hr-07.\n**ATT&CK mapping:**\n- T1059.001 PowerShell (Execution) - EVL-05a\n- T1027.010 Command Obfuscation (Stealth) - EVL-05a\n**Prompt-injection check:** none found\n**Recommended next steps:**\n1. Containment for host `ws-hr-07` has been requested (request ID: 7d79f9b6) to prevent further malicious activity.\n2. Investigate the source of the `winword.exe` process and how it spawned the PowerShell command.\n3. Analyze the decoded PowerShell command to understand its purpose.\n4. Perform a full scan of `ws-hr-07` for additional compromise.",
+    "tokens": [
+      20718,
+      1567
+    ]
+  }
+]

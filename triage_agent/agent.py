@@ -184,6 +184,16 @@ def citation_gate(callback_context, llm_response):
     return fixed if changed else None
 
 
+# The MCP server subprocess gets only the variables it needs, not the whole environment.
+_MCP_ENV_KEYS = (
+    "PATH", "HOME", "LANG", "TMPDIR",
+    "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION",
+    "GOOGLE_APPLICATION_CREDENTIALS", "CLOUDSDK_CONFIG",
+    "ALERTS_FILE", "QUEUE_FILE",
+)
+_MCP_ENV = {k: os.environ[k] for k in _MCP_ENV_KEYS if k in os.environ}
+
+
 root_agent = Agent(
     model="gemini-2.5-flash",
     name="triage_agent",
@@ -198,7 +208,7 @@ root_agent = Agent(
                 server_params=StdioServerParameters(
                     command=sys.executable,
                     args=[str(MCP_SERVER)],
-                    env=dict(os.environ),
+                    env=_MCP_ENV,
                 ),
                 timeout=30,
             ),
