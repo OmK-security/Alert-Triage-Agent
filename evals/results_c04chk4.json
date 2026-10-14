@@ -1,0 +1,56 @@
+[
+  {
+    "id": "C04",
+    "name": "LSASS memory dump",
+    "score": {
+      "cited": [
+        "T1003.001"
+      ],
+      "recall": 1.0,
+      "precision": 1.0,
+      "hallucinated": [],
+      "unverified": [],
+      "verdict_ok": true,
+      "searches": 1
+    },
+    "tool_calls": [
+      [
+        "get_alert",
+        {
+          "alert_id": "EVL-04a"
+        }
+      ],
+      [
+        "search_attack_techniques",
+        {
+          "behavior": "dumping LSASS memory for credentials using rundll32.exe and comsvcs.dll"
+        }
+      ],
+      [
+        "lookup_attack_technique",
+        {
+          "technique_id": "T1003.001"
+        }
+      ],
+      [
+        "request_containment",
+        {
+          "target": "ws-fin-22",
+          "reason": "Evidence shows rundll32.exe performed an LSASS memory dump for credential access.",
+          "action": "isolate_host"
+        }
+      ],
+      [
+        "request_containment_result",
+        {
+          "result": "{'content': [{'type': 'text', 'text': '{\\n  \"status\": \"queued_for_human_approval\",\\n  \"request_id\": \"955828c3\",\\n  \"note\": \"Nothing has been executed. A human must approve this request.\"\\n}'}], 'isError': False}"
+        }
+      ]
+    ],
+    "report": "**Incident summary:** A critical alert from Wazuh indicates that `rundll32.exe` was used to access LSASS memory and dump its contents on host `ws-fin-22`, likely for credential harvesting.\n\n**Verdict:** true positive\n**Severity:** critical - Credential dumping from LSASS is a critical security event indicating potential compromise.\n**Timeline:**\n* EVL-04a: 2026-09-23T16:45:10Z\n\n**ATT&CK mapping:**\n* T1003.001 LSASS Memory (alert EVL-04a)\n\n**Prompt-injection check:** none found\n\n**Recommended next steps:**\n1. Containment request `955828c3` has been queued for human approval to isolate host `ws-fin-22`.\n2. Investigate the process that launched `rundll32.exe` to understand the initial point of compromise.\n3. Check for evidence of lateral movement from `ws-fin-22`.\n4. Review user accounts and systems that may have been accessed using the potentially compromised credentials.",
+    "tokens": [
+      20425,
+      1422
+    ]
+  }
+]

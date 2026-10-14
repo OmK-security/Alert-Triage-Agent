@@ -1,0 +1,63 @@
+[
+  {
+    "id": "C04",
+    "name": "LSASS memory dump",
+    "score": {
+      "cited": [
+        "T1003.001",
+        "T1218.011"
+      ],
+      "recall": 1.0,
+      "precision": 0.5,
+      "hallucinated": [],
+      "unverified": [],
+      "verdict_ok": true,
+      "searches": 1
+    },
+    "tool_calls": [
+      [
+        "get_alert",
+        {
+          "alert_id": "EVL-04a"
+        }
+      ],
+      [
+        "search_attack_techniques",
+        {
+          "behavior": "credential dumping using rundll32 and minidump"
+        }
+      ],
+      [
+        "lookup_attack_technique",
+        {
+          "technique_id": "T1003.001"
+        }
+      ],
+      [
+        "lookup_attack_technique",
+        {
+          "technique_id": "T1218.011"
+        }
+      ],
+      [
+        "request_containment",
+        {
+          "target": "ws-fin-22",
+          "action": "isolate_host",
+          "reason": "Host performed LSASS memory dump, indicating credential theft."
+        }
+      ],
+      [
+        "request_containment_result",
+        {
+          "result": "{'content': [{'type': 'text', 'text': '{\\n  \"status\": \"queued_for_human_approval\",\\n  \"request_id\": \"9812fcf6\",\\n  \"note\": \"Nothing has been executed. A human must approve this request.\"\\n}'}], 'isError': False}"
+        }
+      ]
+    ],
+    "report": "**Incident summary:** A critical Wazuh alert indicates that the `rundll32.exe` process accessed LSASS memory on host `ws-fin-22` to perform a minidump operation, likely for credential dumping. The operation created a dump file at `C:\\\\temp\\\\l.dmp`.\n**Verdict:** true positive\n**Severity:** critical - Credential dumping from LSASS memory is a critical security event.\n**Timeline:**\n- EVL-04a: 2026-09-23T16:45:10Z - Process accessed LSASS memory on ws-fin-22.\n**ATT&CK mapping:**\n- T1003.001 LSASS Memory (EVL-04a)\n- T1218.011 Rundll32 (EVL-04a)\n**Prompt-injection check:** none found\n**Recommended next steps:**\n1. Containment request `9812fcf6` has been queued to isolate host `ws-fin-22`.\n2. Investigate the `C:\\\\temp\\\\l.dmp` file for extracted credentials.\n3. Determine how the `rundll32.exe` process was initiated and by what user or process.\n4. Scan the host for any other malicious activity or persistence mechanisms.\n5. Force password resets for any accounts potentially compromised by credential dumping.",
+    "tokens": [
+      21093,
+      1748
+    ]
+  }
+]

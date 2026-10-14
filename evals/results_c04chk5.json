@@ -1,0 +1,56 @@
+[
+  {
+    "id": "C04",
+    "name": "LSASS memory dump",
+    "score": {
+      "cited": [
+        "T1003.001"
+      ],
+      "recall": 1.0,
+      "precision": 1.0,
+      "hallucinated": [],
+      "unverified": [],
+      "verdict_ok": true,
+      "searches": 1
+    },
+    "tool_calls": [
+      [
+        "get_alert",
+        {
+          "alert_id": "EVL-04a"
+        }
+      ],
+      [
+        "search_attack_techniques",
+        {
+          "behavior": "process accessed LSASS memory to dump credentials using rundll32.exe and comsvcs.dll"
+        }
+      ],
+      [
+        "lookup_attack_technique",
+        {
+          "technique_id": "T1003.001"
+        }
+      ],
+      [
+        "request_containment",
+        {
+          "action": "isolate_host",
+          "reason": "Host ws-fin-22 shows critical evidence of LSASS credential dumping.",
+          "target": "ws-fin-22"
+        }
+      ],
+      [
+        "request_containment_result",
+        {
+          "result": "{'content': [{'type': 'text', 'text': '{\\n  \"status\": \"queued_for_human_approval\",\\n  \"request_id\": \"ce1d3734\",\\n  \"note\": \"Nothing has been executed. A human must approve this request.\"\\n}'}], 'isError': False}"
+        }
+      ]
+    ],
+    "report": "**Incident summary:** A critical alert from Wazuh indicates that `rundll32.exe` accessed LSASS memory on host `ws-fin-22` to dump credentials, specifically using `comsvcs.dll` to create a minidump. This activity is a strong indicator of post-exploitation credential access.\n**Verdict:** true positive\n**Severity:** critical - Evidence of LSASS credential dumping.\n**Timeline:**\n*   2026-09-23T16:45:10Z - EVL-04a: Process accessed LSASS memory\n**ATT&CK mapping:**\n*   T1003.001 LSASS Memory (from alert EVL-04a)\n**Prompt-injection check:** none found\n**Recommended next steps:**\n1.  Review and approve containment request `ce1d3734` to isolate host `ws-fin-22`.\n2.  Investigate host `ws-fin-22` for signs of initial compromise and further malicious activity.\n3.  Analyze the dumped `l.dmp` file for compromised credentials.\n4.  Force password resets for any accounts found in the dumped credentials.\n5.  Perform a broader search for similar LSASS access attempts across the environment.",
+    "tokens": [
+      19655,
+      1246
+    ]
+  }
+]

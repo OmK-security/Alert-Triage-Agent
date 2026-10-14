@@ -1,0 +1,56 @@
+[
+  {
+    "id": "C04",
+    "name": "LSASS memory dump",
+    "score": {
+      "cited": [
+        "T1003.001"
+      ],
+      "recall": 1.0,
+      "precision": 1.0,
+      "hallucinated": [],
+      "unverified": [],
+      "verdict_ok": true,
+      "searches": 1
+    },
+    "tool_calls": [
+      [
+        "get_alert",
+        {
+          "alert_id": "EVL-04a"
+        }
+      ],
+      [
+        "search_attack_techniques",
+        {
+          "behavior": "process accessing LSASS memory for credential dumping"
+        }
+      ],
+      [
+        "lookup_attack_technique",
+        {
+          "technique_id": "T1003.001"
+        }
+      ],
+      [
+        "request_containment",
+        {
+          "action": "isolate_host",
+          "reason": "Host attempted to dump LSASS memory, indicating credential theft.",
+          "target": "ws-fin-22"
+        }
+      ],
+      [
+        "request_containment_result",
+        {
+          "result": "{'content': [{'type': 'text', 'text': '{\\n  \"status\": \"queued_for_human_approval\",\\n  \"request_id\": \"e87fe6cb\",\\n  \"note\": \"Nothing has been executed. A human must approve this request.\"\\n}'}], 'isError': False}"
+        }
+      ]
+    ],
+    "report": "**Incident summary:** A critical Wazuh alert detected a process accessing LSASS memory on host `ws-fin-22` (10.20.4.22). The `rundll32.exe` command was used with `comsvcs.dll` to perform a MiniDump, indicating an attempt at credential dumping.\n**Verdict:** true positive\n**Severity:** critical - Direct attempt to dump credentials from LSASS memory.\n**Timeline:**\n*   EVL-04a: 2026-09-23T16:45:10Z - Process accessed LSASS memory\n**ATT&CK mapping:**\n*   T1003.001 LSASS Memory (Credential Access) - EVL-04a\n**Prompt-injection check:** none found\n**Recommended next steps:**\n1.  Containment request `e87fe6cb` for `ws-fin-22` has been queued for human approval to isolate the host.\n2.  Investigate the process that initiated `rundll32.exe` and dumped LSASS memory.\n3.  Perform forensic analysis on `ws-fin-22` to identify compromised accounts and data exfiltration.\n4.  Force password resets for any accounts potentially compromised.",
+    "tokens": [
+      20383,
+      1370
+    ]
+  }
+]

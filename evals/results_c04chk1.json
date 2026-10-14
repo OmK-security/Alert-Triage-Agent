@@ -1,0 +1,56 @@
+[
+  {
+    "id": "C04",
+    "name": "LSASS memory dump",
+    "score": {
+      "cited": [
+        "T1003.001"
+      ],
+      "recall": 1.0,
+      "precision": 1.0,
+      "hallucinated": [],
+      "unverified": [],
+      "verdict_ok": true,
+      "searches": 1
+    },
+    "tool_calls": [
+      [
+        "get_alert",
+        {
+          "alert_id": "EVL-04a"
+        }
+      ],
+      [
+        "search_attack_techniques",
+        {
+          "behavior": "process accessed LSASS memory to dump credentials"
+        }
+      ],
+      [
+        "lookup_attack_technique",
+        {
+          "technique_id": "T1003.001"
+        }
+      ],
+      [
+        "request_containment",
+        {
+          "reason": "Host accessed LSASS memory to dump credentials, indicating potential credential theft.",
+          "target": "ws-fin-22",
+          "action": "isolate_host"
+        }
+      ],
+      [
+        "request_containment_result",
+        {
+          "result": "{'content': [{'type': 'text', 'text': '{\\n  \"status\": \"queued_for_human_approval\",\\n  \"request_id\": \"39c69cd0\",\\n  \"note\": \"Nothing has been executed. A human must approve this request.\"\\n}'}], 'isError': False}"
+        }
+      ]
+    ],
+    "report": "**Incident summary:** A critical alert indicates that `rundll32.exe` accessed LSASS memory on host `ws-fin-22` to dump credentials. This is a common technique used by attackers to steal authentication material.\n**Verdict:** true positive\n**Severity:** critical - Evidence of credential dumping\n**Timeline:**\n- EVL-04a: 2026-09-23T16:45:10Z - Process accessed LSASS memory\n**ATT&CK mapping:**\n- T1003.001 LSASS Memory (EVL-04a)\n**Prompt-injection check:** none found\n**Recommended next steps:**\n1. Isolate host `ws-fin-22` (containment request ID: `39c69cd0`) to prevent further compromise.\n2. Investigate the initial compromise vector that allowed the execution of the LSASS dump.\n3. Force a password reset for any users who were logged into `ws-fin-22` at the time of the incident.\n4. Review logs on `ws-fin-22` for any other suspicious activity before and after the alert.",
+    "tokens": [
+      19585,
+      1167
+    ]
+  }
+]
