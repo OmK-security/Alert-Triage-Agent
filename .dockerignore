@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+**/.env
+.git/
+.adk/
+data/raw/
+data/pending_actions.jsonl
+data/decisions.jsonl
+evals/
