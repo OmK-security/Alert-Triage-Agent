@@ -1,5 +1,7 @@
 import json
 import os
+import ipaddress
+import re
 import time
 import uuid
 from pathlib import Path
@@ -112,6 +114,91 @@ def lookup_attack_technique(technique_id: str) -> dict:
 QUEUE_FILE = Path(os.getenv("QUEUE_FILE", DATA_DIR / "pending_actions.jsonl"))
 ALLOWED_ACTIONS = {"block_ip", "isolate_host"}
 
+# ---------------------------------------------------------------------------
+# Server-side policy: enforced HERE, so it holds no matter which client calls the tool.
+# ---------------------------------------------------------------------------
+_POLICY = json.loads((Path(__file__).parent / "policy.json").read_text())
+_PROTECTED = {x.lower() for x in _POLICY["protected_hosts"] + _POLICY["protected_ips"]}
+_HOST_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{0,62}$")
+
+
+def _alert_targets() -> set:
+    """Every src_ip / host that appears as a structured field in the alert store."""
+    found = set()
+
+    def walk(x):
+        if isinstance(x, dict):
+            for k, v in x.items():
+                if k in ("src_ip", "host") and isinstance(v, str):
+                    found.add(v.strip().lower())
+                else:
+                    walk(v)
+        elif isinstance(x, list):
+            for item in x:
+                walk(item)
+
+    with open(ALERTS_FILE, encoding="utf-8") as f:
+        walk(json.load(f))
+    return found
+
+
+def _policy_problem(action: str, target: str):
+    """Return a reason string if the request breaks policy, else None."""
+    t = target.lower()
+    if action == "block_ip":
+        try:
+            ip = ipaddress.ip_address(t)
+        except ValueError:
+            return "block_ip needs a single valid IP address"
+        if ip.is_loopback or ip.is_multicast or ip.is_unspecified or ip.is_link_local or ip.is_reserved:
+            return "not a blockable address"
+    elif not _HOST_RE.match(t):
+        return "invalid hostname"
+    if t in _PROTECTED:
+        return "protected asset: containment needs a human decision"
+    if t not in _alert_targets():
+        return "target is not a src_ip or host of any known alert"
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Approval queue backends: a local file (dev/evals) or Firestore (deployed).
+# ---------------------------------------------------------------------------
+QUEUE_BACKEND = os.getenv("QUEUE_BACKEND", "file")
+_fs = None
+
+
+def _firestore():
+    global _fs
+    if _fs is None:
+        from google.cloud import firestore
+        _fs = firestore.Client(project=PROJECT_ID)
+    return _fs
+
+
+def _has_pending(action: str, target: str) -> bool:
+    if QUEUE_BACKEND == "firestore":
+        q = (_firestore().collection("pending_actions")
+             .where("status", "==", "pending").where("action", "==", action)
+             .where("target", "==", target).limit(1))
+        return any(True for _ in q.stream())
+    if not QUEUE_FILE.exists():
+        return False
+    with open(QUEUE_FILE, encoding="utf-8") as f:
+        for line in f:
+            r = json.loads(line)
+            if r.get("status") == "pending" and r["action"] == action and r["target"] == target:
+                return True
+    return False
+
+
+def _queue_add(req: dict) -> None:
+    if QUEUE_BACKEND == "firestore":
+        _firestore().collection("pending_actions").document(req["request_id"]).set(req)
+        return
+    with open(QUEUE_FILE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(req) + "\n")
+
 
 @mcp.tool()
 def request_containment(action: str, target: str, reason: str) -> dict:
@@ -131,10 +218,15 @@ def request_containment(action: str, target: str, reason: str) -> dict:
         return {"status": "rejected", "error": f"action must be one of {sorted(ALLOWED_ACTIONS)}"}
     if not target:
         return {"status": "rejected", "error": "target is required"}
+    problem = _policy_problem(action, target)
+    if problem:
+        return {"status": "rejected_by_server_policy", "error": problem,
+                "note": "No request was queued."}
+    if _has_pending(action, target):
+        return {"status": "duplicate", "error": "an identical request is already pending"}
     req = {"request_id": uuid.uuid4().hex[:8], "ts": time.time(), "action": action,
            "target": target, "reason": reason, "status": "pending"}
-    with open(QUEUE_FILE, "a", encoding="utf-8") as f:
-        f.write(json.dumps(req) + "\n")
+    _queue_add(req)
     return {"status": "queued_for_human_approval", "request_id": req["request_id"],
             "note": "Nothing has been executed. A human must approve this request."}
 
