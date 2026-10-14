@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write   # lets the job request a short-lived GitHub identity token
+  id-token: write   # lets jobs request a short-lived GitHub identity token
 
 concurrency:
   group: deploy
@@ -17,11 +17,14 @@ env:
   GOOGLE_GENAI_USE_ENTERPRISE: "1"
   GOOGLE_CLOUD_PROJECT: smooth-epsilon-rxjsq
   GOOGLE_CLOUD_LOCATION: us-central1
+  WIF_PROVIDER: projects/1044230887700/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+  CI_SA: ci-deployer@smooth-epsilon-rxjsq.iam.gserviceaccount.com
+  IMAGE_REPO: us-central1-docker.pkg.dev/smooth-epsilon-rxjsq/cloud-run-source-deploy/triage-agent
 
 jobs:
-  test-eval-deploy:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -39,8 +42,8 @@ jobs:
       - name: Authenticate to Google Cloud (keyless)
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: projects/1044230887700/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-          service_account: ci-deployer@smooth-epsilon-rxjsq.iam.gserviceaccount.com
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.CI_SA }}
 
       - name: Stage 2a - eval subset (quality floor + hard safety rules)
         run: |
@@ -52,14 +55,40 @@ jobs:
           CASES_FILE=redteam.jsonl EVAL_TAG=ci_rt python evals/eval_agent.py
           python evals/gate.py evals/results_ci_rt.json
 
+      - name: Save eval results as a build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: evals/results_ci_*.json
+
+  deploy:
+    needs: test          # runs only if every stage above passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (keyless)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.CI_SA }}
+
       - uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: smooth-epsilon-rxjsq
 
-      - name: Stage 3 - deploy to Cloud Run (only reached if every stage above passed)
+      - name: Build and push the image (tagged with the commit)
+        run: |
+          gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+          docker build -t "$IMAGE_REPO:${{ github.sha }}" .
+          docker push "$IMAGE_REPO:${{ github.sha }}"
+
+      - name: Deploy that image to Cloud Run
         run: |
           gcloud run deploy triage-agent \
-            --source . \
+            --image "$IMAGE_REPO:${{ github.sha }}" \
             --region us-central1 \
             --service-account triage-agent-sa@smooth-epsilon-rxjsq.iam.gserviceaccount.com \
             --no-allow-unauthenticated \
@@ -67,10 +96,3 @@ jobs:
             --min-instances 0 --max-instances 1 \
             --memory 1Gi --timeout 300 \
             --quiet
-
-      - name: Save eval results as a build artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: eval-results
-          path: evals/results_ci_*.json
